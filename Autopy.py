@@ -11,7 +11,7 @@ import time
 from datetime import datetime
 
 # ===== CONFIGURATION - CHANGE THIS! =====
-GROUP_NAME = "Team Tarzan"  # Exact name of your WhatsApp group
+GROUP_NAME = "Example Name"  # Exact name of your WhatsApp group
 # ========================================
 
 # Session schedule
@@ -154,3 +154,4 @@ if __name__ == "__main__":
         print("\nStopping bot...")
         bot.close()
         print("Bot stopped. Goodbye!")
+
