@@ -1,0 +1,169 @@
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+import schedule
+import time
+from datetime import datetime
+
+# ===== CONFIGURATION - CHANGE THIS! =====
+GROUP_NAME = "Your Group Name Here"  # Exact name of your WhatsApp group
+# ========================================
+
+# Session schedule
+SESSIONS = {
+    "Monday": {"day": "Tuesday", "time": "6:00 AM"},
+    "Tuesday": {"day": "Wednesday", "time": "5:00 PM"},
+    "Wednesday": {"day": "Thursday", "time": "6:00 AM"},
+    "Friday": {"day": "Saturday", "time": "5:00 PM"}
+}
+
+class WhatsAppBot:
+    def __init__(self):
+        self.driver = None
+        self.is_logged_in = False
+    
+    def start_browser(self):
+        """Start Chrome and open WhatsApp Web"""
+        print("Starting browser...")
+        self.driver = webdriver.Chrome()
+        self.driver.get("https://web.whatsapp.com")
+        print("\n📱 SCAN THE QR CODE WITH YOUR PHONE NOW!")
+        print("Waiting for you to log in...")
+        
+        # Wait for user to scan QR code and log in (max 60 seconds)
+        try:
+            WebDriverWait(self.driver, 60).until(
+                EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="3"]'))
+            )
+            self.is_logged_in = True
+            print("✅ Successfully logged in!\n")
+        except:
+            print("❌ Login timeout. Please restart and scan QR code faster.")
+            self.driver.quit()
+    
+    def send_message(self, group_name, message):
+        """Send a message to a WhatsApp group"""
+        if not self.is_logged_in:
+            print("Not logged in!")
+            return False
+        
+        try:
+            # Search for the group
+            print(f"Searching for group: {group_name}")
+            search_box = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="3"]'))
+            )
+            search_box.click()
+            search_box.clear()
+            search_box.send_keys(group_name)
+            time.sleep(2)
+            
+            # Click on the group
+            group_title = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, f'//span[@title="{group_name}"]'))
+            )
+            group_title.click()
+            time.sleep(1)
+            
+            # Find message box and send message
+            message_box = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, '//div[@contenteditable="true"][@data-tab="10"]'))
+            )
+            
+            # Split message by lines and send
+            lines = message.split('\n')
+            for i, line in enumerate(lines):
+                message_box.send_keys(line)
+                if i < len(lines) - 1:
+                    message_box.send_keys(Keys.SHIFT + Keys.ENTER)
+            
+            message_box.send_keys(Keys.ENTER)
+            print(f"✅ Message sent at {datetime.now().strftime('%H:%M:%S')}")
+            
+            # Log the message
+            with open("message_log.txt", "a") as f:
+                f.write(f"{datetime.now()} - Sent to {group_name}\n")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error sending message: {e}")
+            return False
+    
+    def close(self):
+        """Close the browser"""
+        if self.driver:
+            self.driver.quit()
+
+# Create bot instance
+bot = WhatsAppBot()
+
+def send_session_reminder(day_name):
+    """Send reminder for specific day"""
+    session_info = SESSIONS[day_name]
+    message = f"""🗓️ Session Reminder
+
+Tomorrow's session: {session_info['day']} at {session_info['time']}
+
+Please reply with:
+✅ - I'm coming
+❌ - Can't make it
+
+See you there! 💪"""
+    
+    print(f"\n📨 Sending {day_name} reminder...")
+    bot.send_message(GROUP_NAME, message)
+
+# Schedule functions
+def monday_reminder():
+    send_session_reminder("Monday")
+
+def tuesday_reminder():
+    send_session_reminder("Tuesday")
+
+def wednesday_reminder():
+    send_session_reminder("Wednesday")
+
+def friday_reminder():
+    send_session_reminder("Friday")
+
+# Main execution
+if __name__ == "__main__":
+    print("=" * 50)
+    print("WhatsApp Session Reminder Bot")
+    print("=" * 50)
+    
+    # Start browser and login
+    bot.start_browser()
+    
+    if not bot.is_logged_in:
+        exit()
+    
+    # Schedule all reminders for 6 PM (18:00)
+    schedule.every().monday.at("18:00").do(monday_reminder)
+    schedule.every().tuesday.at("18:00").do(tuesday_reminder)
+    schedule.every().wednesday.at("18:00").do(wednesday_reminder)
+    schedule.every().friday.at("18:00").do(friday_reminder)
+    
+    print("\n✅ Bot is now running!")
+    print("\nScheduled messages:")
+    print("  • Monday at 6:00 PM → Tuesday 6 AM session")
+    print("  • Tuesday at 6:00 PM → Wednesday 5 PM session")
+    print("  • Wednesday at 6:00 PM → Thursday 6 AM session")
+    print("  • Friday at 6:00 PM → Saturday 5 PM session")
+    print("\n⚠️  Keep this window open! Don't close the browser.")
+    print("Press Ctrl+C to stop the bot.\n")
+    
+    # Keep running and check schedule
+    try:
+        while True:
+            schedule.run_pending()
+            time.sleep(60)  # Check every minute
+    except KeyboardInterrupt:
+        print("\n\nStopping bot...")
+        bot.close()
+        print("Bot stopped. Goodbye!")
